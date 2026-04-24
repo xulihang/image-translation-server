@@ -1,0 +1,26 @@
+[
+    {
+        "ocrInterval": 100,
+        "engine": "tencent",
+        "panel_detection_method": 0,
+        "name": "default",
+        "mergeOperation": "2",
+        "detectionMethod": "3",
+        "scale": 0.5,
+        "interval": 0,
+        "type": "MT",
+        "auto_remove_low_confidence_areas": true,
+        "play_sound": false,
+        "flow": [
+            "Text detection (3)",
+            "Recognize long text areas (rapid (recognize only),3)",
+            "Recognize textless areas mergable with areas with text (manga-ocr,0)",
+            "Detect text direction and set the corresponding style",
+            "Merge areas",
+            "Text recognition (manga-ocr,0)",
+            "Merge areas",
+            "Sort",
+            "Translation"
+        ]
+    }
+]

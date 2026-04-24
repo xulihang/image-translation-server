@@ -1,0 +1,19 @@
+{
+    "ocrInterval": 100,
+    "engine": "tencent",
+    "panel_detection_method": 0,
+    "mergeOperation": "3",
+    "detectionMethod": "0",
+    "scale": 0.5,
+    "interval": 0,
+    "type": "MT",
+    "auto_remove_low_confidence_areas": true,
+    "play_sound": false,
+    "flow": [
+        "Text detection",
+        "Remove areas without source text for all pictures",
+        "Merge areas",
+        "Sort",
+        "Translation"
+    ]
+}

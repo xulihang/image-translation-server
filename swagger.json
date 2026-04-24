@@ -1,0 +1,305 @@
+{
+  "openapi": 3.2.0,
+  "info": {
+    "title": "Image Translation API",
+    "description": "API for image translation service using ImageTrans",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support"
+    }
+  },
+  "host": "localhost:5000",
+  "basePath": "/",
+  "schemes": [
+    "http"
+  ],
+  "paths": {
+    "/api/templates": {
+      "get": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Get available templates",
+        "description": "Returns a list of available templates from the templates directory",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "List of available templates",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "templates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/translate": {
+      "post": {
+        "tags": [
+          "Translation"
+        ],
+        "summary": "Create a new translation task",
+        "description": "Creates a new image translation task and returns a task ID for tracking",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Translation request parameters",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "image_base64",
+                "template_name"
+              ],
+              "properties": {
+                "image_base64": {
+                  "type": "string",
+                  "description": "Base64 encoded image data"
+                },
+                "template_name": {
+                  "type": "string",
+                  "description": "Name of the template to use"
+                },
+                "settings_json": {
+                  "type": "string",
+                  "description": "JSON string with additional project settings"
+                },
+                "preferences_json": {
+                  "type": "string",
+                  "description": "JSON string with additional preferences"
+                },
+                "ocr_based_on_lang": {
+                  "type": "boolean",
+                  "description": "Whether to select OCR based on project language",
+                  "default": false
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task created successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string",
+                  "description": "UUID of the created task"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/api/translate/{task_id}/status": {
+      "get": {
+        "tags": [
+          "Translation"
+        ],
+        "summary": "Get task status",
+        "description": "Check the status of a translation task",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "type": "string",
+            "required": true,
+            "description": "Task ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task status",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "processing",
+                    "completed",
+                    "failed"
+                  ]
+                },
+                "completed": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found"
+          }
+        }
+      }
+    },
+    "/api/translate/{task_id}/result": {
+      "get": {
+        "tags": [
+          "Translation"
+        ],
+        "summary": "Get translation results",
+        "description": "Get the results of a completed translation task",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "type": "string",
+            "required": true,
+            "description": "Task ID"
+          },
+          {
+            "in": "query",
+            "name": "include_base64",
+            "type": "boolean",
+            "required": false,
+            "description": "Whether to include base64 encoded translated image",
+            "default": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Translation results",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "results": {
+                  "type": "object",
+                  "description": "Translation results per image",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "translated": {
+                        "type": "string",
+                        "description": "Base64 encoded translated image (only if requested)"
+                      },
+                      "boxes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            },
+                            "target": {
+                              "type": "string"
+                            },
+                            "geometry": {
+                              "type": "object",
+                              "properties": {
+                                "X": {
+                                  "type": "integer"
+                                },
+                                "width": {
+                                  "type": "integer"
+                                },
+                                "Y": {
+                                  "type": "integer"
+                                },
+                                "height": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Task not completed yet"
+          },
+          "404": {
+            "description": "Task not found"
+          }
+        }
+      }
+    },
+    "/api/tasks": {
+      "get": {
+        "tags": [
+          "Translation"
+        ],
+        "summary": "List all tasks",
+        "description": "Get a list of all translation tasks",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tasks",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "tasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "task_id": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "template_name": {
+                        "type": "string"
+                      },
+                      "created_time": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

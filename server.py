@@ -36,7 +36,7 @@ for d in IMAGETRANS_DIRS:
 # Task management
 tasks = {}
 task_lock = threading.Lock()
-available_workers = list(range(4))  # 0-3 for ImageTrans1-4
+available_workers = list(range(3))  # 0-2 for ImageTrans1-3
 worker_lock = threading.Lock()
 
 # Load existing tasks if any

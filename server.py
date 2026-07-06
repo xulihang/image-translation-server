@@ -172,15 +172,20 @@ def process_image_trans(task_id, template_name, settings_json, preferences_conf,
             text=True  # 以文本模式返回输出
         )
         
-        # 获取输出和错误信息
-        stdout, stderr = process.communicate()
-        
+        # 获取输出和错误信息（1分钟超时）
+        try:
+            stdout, stderr = process.communicate(timeout=60)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            stdout, stderr = process.communicate()
+            print(f"[TIMEOUT] Task {task_id} timed out after 60s, marking as completed")
+
         # 打印输出信息用于调试
         if stdout:
             print(f"[STDOUT] {stdout}")
         if stderr:
             print(f"[STDERR] {stderr}")
-        
+
         # Update task status
         with task_lock:
             if process.returncode == 0:

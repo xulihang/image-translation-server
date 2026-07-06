@@ -494,20 +494,15 @@ def get_translation_result(task_id):
     include_base64 = request.args.get('include_base64', 'false').lower() == 'true'
     
     if include_base64:
-        project_dir = TEMPLATES_DIR / task_id / 'project'
+        project_dir = TEMP_DIR / task_id / 'project'
         for image_name in results:
             # Look for translated image (might have different naming conventions)
-            for ext in ['.jpg', '.png', '.webp']:
-                img_file = project_dir / f'translated_{image_name}{ext}'
-                if not img_file.exists():
-                    img_file = project_dir / image_name
-                
-                if img_file.exists():
-                    import base64
-                    with open(img_file, 'rb') as f:
-                        img_data = base64.b64encode(f.read()).decode('utf-8')
-                    results[image_name]['translated'] = img_data
-                    break
+            img_file = project_dir / 'out' / image_name
+            if img_file.exists():
+                import base64
+                with open(img_file, 'rb') as f:
+                    img_data = base64.b64encode(f.read()).decode('utf-8')
+                results[image_name]['translated'] = img_data
     
     return jsonify({
         'task_id': task_id,

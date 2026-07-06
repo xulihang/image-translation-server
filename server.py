@@ -63,7 +63,7 @@ def cleanup_task(task_id):
             save_tasks()
 
 
-def process_image_trans(task_id, template_name, settings_json, preferences_conf, ocr_based_on_lang):
+def process_image_trans(task_id, template_name, settings_json, preferences_conf, ocr_based_on_lang, headless=False):
     """Process image translation in a worker thread"""
     worker_id = None
     
@@ -143,6 +143,14 @@ def process_image_trans(task_id, template_name, settings_json, preferences_conf,
         cmd = [
             str(java_path),
             '-Xmx2048M',
+        ]
+
+        if headless:
+            cmd.extend([
+                '-Dglass.platform=headless',
+            ])
+
+        cmd += [
             '--module-path', str(imagetrans_dir / 'jre' / 'javafx' / 'lib'),
             '--add-modules', 'javafx.base,javafx.controls,javafx.graphics,javafx.web,javafx.swing',
             '--add-opens', 'javafx.controls/com.sun.javafx.scene.control.skin=ALL-UNNAMED',
@@ -326,6 +334,10 @@ def create_translation_task():
               type: boolean
               description: Whether to select OCR based on project language
               default: false
+            headless:
+              type: boolean
+              description: Whether to run JavaFX in headless mode
+              default: false
     responses:
       200:
         description: Task created successfully
@@ -374,11 +386,12 @@ def create_translation_task():
                 'settings_json': data.get('settings_json'),
                 'preferences_json': data.get('preferences_json'),
                 'ocr_based_on_lang': data.get('ocr_based_on_lang', False),
+                'headless': data.get('headless', False),
                 'created_time': datetime.now().isoformat(),
                 'work_dir': str(TEMP_DIR / task_id)
             }
             save_tasks()
-        
+
         # Start processing in background
         thread = threading.Thread(
             target=process_image_trans,
@@ -387,7 +400,8 @@ def create_translation_task():
                 template_name,
                 data.get('settings_json'),
                 data.get('preferences_json'),
-                data.get('ocr_based_on_lang', False)
+                data.get('ocr_based_on_lang', False),
+                data.get('headless', False)
             )
         )
         thread.daemon = True

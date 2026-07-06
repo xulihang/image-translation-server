@@ -394,6 +394,12 @@
                             <label for="ocrBasedOnLang">根据项目语言选择OCR</label>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="headless">
+                            <label for="headless">无头模式 (JavaFX Headless)</label>
+                        </div>
+                    </div>
                     <button class="btn btn-primary" onclick="createTranslationTask()">
                         🚀 创建翻译任务
                     </button>
@@ -605,6 +611,7 @@
             const settingsJson = document.getElementById('settingsJson').value.trim();
             const preferencesJson = document.getElementById('preferencesJson').value.trim();
             const ocrBasedOnLang = document.getElementById('ocrBasedOnLang').checked;
+            const headless = document.getElementById('headless').checked;
 
             // 验证
             if (!imageBase64) {
@@ -619,7 +626,8 @@
             const requestData = {
                 image_base64: imageBase64,
                 template_name: templateName,
-                ocr_based_on_lang: ocrBasedOnLang
+                ocr_based_on_lang: ocrBasedOnLang,
+                headless: headless
             };
 
             if (settingsJson) {

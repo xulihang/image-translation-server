@@ -1,6 +1,6 @@
 {
     "ocrInterval": 100,
-    "engine": "tencent",
+    "engine": "deepseek",
     "panel_detection_method": 0,
     "mergeOperation": "3",
     "detectionMethod": "0",
@@ -14,6 +14,7 @@
         "Remove areas without source text for all pictures",
         "Merge areas",
         "Sort",
-        "Translation"
+        "Translation",
+        "Generate translated pictures"
     ]
 }

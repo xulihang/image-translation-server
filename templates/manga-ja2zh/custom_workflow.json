@@ -1,7 +1,7 @@
 [
     {
         "ocrInterval": 100,
-        "engine": "tencent",
+        "engine": "deepseek",
         "panel_detection_method": 0,
         "name": "default",
         "mergeOperation": "2",
@@ -20,7 +20,8 @@
             "Text recognition (manga-ocr,0)",
             "Merge areas",
             "Sort",
-            "Translation"
+            "Translation",
+            "Generate translated pictures"
         ]
     }
 ]

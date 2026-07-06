@@ -86,15 +86,6 @@ def process_image_trans(task_id, template_name, settings_json, preferences_conf,
         if template_dir.exists():
             shutil.copytree(template_dir, task_dir, dirs_exist_ok=True)
         
-        # Copy image to project directory
-        with task_lock:
-            image_data = tasks[task_id]['image_base64']
-        
-        import base64
-        image_bytes = base64.b64decode(image_data)
-        with open(project_dir / '0.jpg', 'wb') as f:
-            f.write(image_bytes)
-        
         # Handle OCR based on language setting
         if ocr_based_on_lang:
             (task_dir / 'setOCRBasedOnLang').touch()
@@ -360,18 +351,26 @@ def create_translation_task():
         
         # Generate task ID
         task_id = str(uuid.uuid4())
-        
-        # Store task
+
+        # Save image to project directory immediately (don't store in tasks.json)
+        task_dir = TEMP_DIR / task_id
+        project_dir = task_dir / 'project'
+        project_dir.mkdir(parents=True, exist_ok=True)
+        import base64
+        image_bytes = base64.b64decode(data['image_base64'])
+        with open(project_dir / '0.jpg', 'wb') as f:
+            f.write(image_bytes)
+
+        # Store task (without image data)
         with task_lock:
             tasks[task_id] = {
                 'status': 'queued',
                 'template_name': template_name,
-                'image_base64': data['image_base64'],
                 'settings_json': data.get('settings_json'),
                 'preferences_json': data.get('preferences_json'),
                 'ocr_based_on_lang': data.get('ocr_based_on_lang', False),
                 'created_time': datetime.now().isoformat(),
-                'work_dir': str(TEMPLATES_DIR / task_id)
+                'work_dir': str(TEMP_DIR / task_id)
             }
             save_tasks()
         

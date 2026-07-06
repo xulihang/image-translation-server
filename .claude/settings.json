@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"C:\\\\Users\\\\admin\\\\Desktop\\\\git\\\\ImageTrans_wsServer\\\\Files\")",
+      "Read(//c/Users/admin/Desktop/git/ImageTrans_wsServer/Files/**)",
+      "Bash(ls \"C:\\\\Users\\\\admin\\\\Desktop\\\\git\\\\ImageTrans_wsServer\\\\AutoBackups\")",
+      "Read(//c/Users/admin/Desktop/git/ImageTrans_wsServer/AutoBackups/**)",
+      "Read(//c/Users/admin/Desktop/git/ImageTrans_wsServer/**)"
+    ]
+  }
+}

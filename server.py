@@ -264,6 +264,60 @@ def read_itp_file(task_id):
     return results
 
 
+def map_template_name(ws_template):
+    """Map wsServer template names to available templates"""
+    if not ws_template:
+        ws_template = 'general'
+
+    template_dir = TEMPLATES_DIR / ws_template
+    if template_dir.exists():
+        return ws_template
+
+    mapping = {
+        'general': 'comics',
+        'manga': 'manga-ja2zh',
+        'cg': 'comics',
+        'webtoon': 'comics',
+        'chinese-manhua': 'comics',
+        'document': 'comics',
+    }
+
+    mapped = mapping.get(ws_template)
+    if mapped and (TEMPLATES_DIR / mapped).exists():
+        return mapped
+
+    for d in TEMPLATES_DIR.iterdir():
+        if d.is_dir():
+            return d.name
+
+    return 'comics'
+
+
+def convert_to_jpg(image_bytes):
+    """Convert any image format bytes to JPEG bytes using Pillow."""
+    from io import BytesIO
+    from PIL import Image
+    img = Image.open(BytesIO(image_bytes))
+    if img.mode in ('RGBA', 'P', 'LA'):
+        img = img.convert('RGB')
+    buf = BytesIO()
+    img.save(buf, format='JPEG', quality=92)
+    return buf.getvalue()
+
+
+def convert_to_webp_base64(filepath):
+    """Read an image file, convert to WebP, return base64 string."""
+    import base64
+    from io import BytesIO
+    from PIL import Image
+    img = Image.open(filepath)
+    if img.mode in ('RGBA', 'P', 'LA'):
+        img = img.convert('RGB')
+    buf = BytesIO()
+    img.save(buf, format='WEBP', quality=85)
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
+
+
 # Swagger UI setup
 SWAGGER_URL = '/api/docs'
 API_URL = '/static/swagger.json'
@@ -562,6 +616,317 @@ def index():
 def swagger_json():
     """Serve Swagger JSON"""
     return send_from_directory('.', 'swagger.json')
+
+
+@app.route('/translate', methods=['POST'])
+def translate_compatible():
+    """
+    Compatible endpoint matching ImageTrans_wsServer's /translate.
+    Accepts application/x-www-form-urlencoded, returns JSON synchronously.
+    """
+    import base64
+
+    src = request.form.get('src', '')
+    source_lang = request.form.get('sourceLang', '')
+    target_lang = request.form.get('targetLang', '')
+    template = request.form.get('template', 'general')
+    project_settings = request.form.get('projectSettings', '')
+    apis = request.form.get('apis', '')
+    without_image = request.form.get('withoutImage', 'false').lower() == 'true'
+    response_type = request.form.get('type', '')
+    callback = request.form.get('callback', '')
+    headless = request.form.get('headless', 'false').lower() == 'true'
+
+    if not src:
+        resp = {'success': False, 'message': 'src is required'}
+        if callback:
+            return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+        return jsonify(resp), 400
+
+    # Extract base64 from data URI or raw base64
+    if ',' in src and src.startswith('data:'):
+        image_base64 = src.split(',', 1)[1]
+    else:
+        image_base64 = src
+
+    try:
+        image_bytes = base64.b64decode(image_base64)
+    except Exception:
+        resp = {'success': False, 'message': 'Invalid base64 image data'}
+        if callback:
+            return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+        return jsonify(resp), 400
+
+    # Map template name
+    template_name = map_template_name(template)
+
+    # Build settings from wsServer params
+    settings = {}
+    if project_settings:
+        try:
+            settings.update(json.loads(project_settings))
+        except json.JSONDecodeError:
+            pass
+    if source_lang:
+        settings['sourceLang'] = source_lang
+    if target_lang:
+        settings['targetLang'] = target_lang
+    if apis:
+        try:
+            settings.update(json.loads(apis))
+        except json.JSONDecodeError:
+            pass
+
+    settings_json = json.dumps(settings) if settings else None
+
+    # Create task
+    task_id = str(uuid.uuid4())
+
+    task_dir = TEMP_DIR / task_id
+    project_dir = task_dir / 'project'
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    # Convert to JPG for ImageTrans compatibility
+    try:
+        image_bytes = convert_to_jpg(image_bytes)
+    except Exception:
+        pass  # fall through with original bytes if conversion fails
+
+    with open(project_dir / '0.jpg', 'wb') as f:
+        f.write(image_bytes)
+
+    with task_lock:
+        tasks[task_id] = {
+            'status': 'queued',
+            'template_name': template_name,
+            'settings_json': settings_json,
+            'preferences_json': None,
+            'ocr_based_on_lang': True,
+            'headless': headless,
+            'created_time': datetime.now().isoformat(),
+            'work_dir': str(TEMP_DIR / task_id)
+        }
+        save_tasks()
+
+    thread = threading.Thread(
+        target=process_image_trans,
+        args=(task_id, template_name, settings_json, None, True, headless)
+    )
+    thread.daemon = True
+    thread.start()
+
+    # Wait for completion (synchronous, matching wsServer behavior)
+    timeout = 240
+    elapsed = 0
+    while elapsed < timeout:
+        time.sleep(1)
+        elapsed += 1
+
+        with task_lock:
+            task = tasks.get(task_id)
+
+        if not task:
+            break
+
+        if task['status'] == 'completed':
+            results = read_itp_file(task_id)
+            if not results:
+                resp = {'success': False, 'message': 'Results not available'}
+                if callback:
+                    return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+                return jsonify(resp)
+
+            boxes = []
+            for image_name, image_data in results.items():
+                for box in image_data.get('boxes', []):
+                    entry = {
+                        'text': box.get('text', ''),
+                        'target': box.get('target', ''),
+                        'geometry': box.get('geometry', {})
+                    }
+                    if 'targetGeometry' in box:
+                        entry['targetGeometry'] = box['targetGeometry']
+                    else:
+                        entry['targetGeometry'] = box.get('geometry', {})
+                    boxes.append(entry)
+
+            resp = {'success': True, 'imgMap': {'boxes': boxes}}
+
+            if not without_image:
+                out_dir = TEMP_DIR / task_id / 'project' / 'out'
+                if out_dir.exists():
+                    for image_name in results:
+                        img_file = out_dir / image_name
+                        if img_file.exists():
+                            resp['img'] = convert_to_webp_base64(img_file)
+                            break
+
+            if response_type == 'html' and 'img' in resp:
+                html = f'<img src="data:image/webp;base64,{resp["img"]}">'
+                if callback:
+                    return f'{callback}({json.dumps({"html": html})})', 200, {'Content-Type': 'application/javascript'}
+                return html
+
+            if callback:
+                return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+            return jsonify(resp)
+
+        elif task['status'] == 'failed':
+            error = task.get('error', 'Translation failed')
+            resp = {'success': False, 'message': error}
+            if callback:
+                return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+            return jsonify(resp)
+
+    # Timeout
+    resp = {'success': False, 'message': 'timeout'}
+    if callback:
+        return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+    return jsonify(resp)
+
+
+@app.route('/translateRegion', methods=['POST'])
+def translate_region_compatible():
+    """
+    Compatible endpoint matching ImageTrans_wsServer's /translateRegion.
+    OCR and translate a single image region.
+    """
+    import base64
+
+    image_b64 = request.form.get('base64', '')
+    source_lang = request.form.get('sourceLang', '')
+    target_lang = request.form.get('targetLang', '')
+    callback = request.form.get('callback', '')
+
+    if not image_b64:
+        resp = {'success': False, 'message': 'base64 is required'}
+        if callback:
+            return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+        return jsonify(resp)
+
+    # Strip data URI prefix if present
+    if ',' in image_b64 and image_b64.startswith('data:'):
+        image_b64 = image_b64.split(',', 1)[1]
+
+    try:
+        image_bytes = base64.b64decode(image_b64)
+    except Exception:
+        resp = {'success': False, 'message': 'Invalid base64 image data'}
+        if callback:
+            return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+        return jsonify(resp), 400
+
+    # Use a minimal template and create a task for region detection + translation
+    template_name = map_template_name('general')
+
+    settings = {}
+    if source_lang:
+        settings['sourceLang'] = source_lang
+    if target_lang:
+        settings['targetLang'] = target_lang
+    settings_json = json.dumps(settings) if settings else None
+
+    task_id = str(uuid.uuid4())
+
+    task_dir = TEMP_DIR / task_id
+    project_dir = task_dir / 'project'
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        image_bytes = convert_to_jpg(image_bytes)
+    except Exception:
+        pass
+
+    with open(project_dir / '0.jpg', 'wb') as f:
+        f.write(image_bytes)
+
+    with task_lock:
+        tasks[task_id] = {
+            'status': 'queued',
+            'template_name': template_name,
+            'settings_json': settings_json,
+            'preferences_json': None,
+            'ocr_based_on_lang': False,
+            'headless': False,
+            'created_time': datetime.now().isoformat(),
+            'work_dir': str(TEMP_DIR / task_id)
+        }
+        save_tasks()
+
+    thread = threading.Thread(
+        target=process_image_trans,
+        args=(task_id, template_name, settings_json, None, False, False)
+    )
+    thread.daemon = True
+    thread.start()
+
+    timeout = 240
+    elapsed = 0
+    while elapsed < timeout:
+        time.sleep(1)
+        elapsed += 1
+
+        with task_lock:
+            task = tasks.get(task_id)
+
+        if not task:
+            break
+
+        if task['status'] == 'completed':
+            results = read_itp_file(task_id)
+            if not results:
+                resp = {'success': False, 'message': 'Results not available'}
+                if callback:
+                    return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+                return jsonify(resp)
+
+            # Build regionMap from first image's first box
+            region_map = {'source': '', 'target': []}
+            for image_data in results.values():
+                boxes = image_data.get('boxes', [])
+                if boxes:
+                    first_box = boxes[0]
+                    region_map['source'] = first_box.get('text', '')
+                    target_text = first_box.get('target', '')
+                    region_map['target'] = [{
+                        'engine': 'imagetrans',
+                        'text': target_text
+                    }]
+                break
+
+            resp = {'success': True, 'regionMap': region_map}
+            if callback:
+                return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+            return jsonify(resp)
+
+        elif task['status'] == 'failed':
+            error = task.get('error', 'Translation failed')
+            resp = {'success': False, 'message': error}
+            if callback:
+                return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+            return jsonify(resp)
+
+    resp = {'success': False, 'message': 'timeout'}
+    if callback:
+        return f'{callback}({json.dumps(resp)})', 200, {'Content-Type': 'application/javascript'}
+    return jsonify(resp)
+
+
+@app.route('/list', methods=['GET'])
+def list_instances():
+    """
+    Compatible endpoint matching ImageTrans_wsServer's /list.
+    Returns connected instances as a JSON array.
+    """
+    with worker_lock:
+        free_count = len(available_workers)
+        running = free_count < MAX_CONCURRENT_TASKS
+
+    return jsonify([{
+        'running': running,
+        'displayName': 'default',
+        'name': 'imagetrans_server'
+    }])
 
 
 if __name__ == '__main__':

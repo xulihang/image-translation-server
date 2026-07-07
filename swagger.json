@@ -88,6 +88,11 @@
                   "type": "boolean",
                   "description": "Whether to select OCR based on project language",
                   "default": false
+                },
+                "headless": {
+                  "type": "boolean",
+                  "description": "Whether to run JavaFX in headless mode",
+                  "default": false
                 }
               }
             }

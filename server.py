@@ -153,6 +153,7 @@ def process_image_trans(task_id, template_name, settings_json, preferences_conf,
         cmd = [
             str(java_path),
             '-Xmx2048M',
+            '-Djava.library.path=./',
         ]
 
         if headless:

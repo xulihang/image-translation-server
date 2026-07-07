@@ -133,6 +133,10 @@ def process_image_trans(task_id, template_name, settings_json, preferences_conf,
                 tasks[task_id]['error'] = error_msg
                 save_tasks()
             return
+
+        # Ensure java has execute permission (zip extraction may lose it on Linux)
+        import stat
+        java_path.chmod(java_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         
         # 检查 ImageTrans.jar 是否存在
         jar_path = imagetrans_dir / 'ImageTrans.jar'
@@ -986,6 +990,14 @@ def upload_imagetrans():
         IMAGETRANS_DIR.mkdir(parents=True)
         with zipfile.ZipFile(temp_zip, 'r') as zf:
             zf.extractall(str(IMAGETRANS_DIR))
+
+        # Fix executable permissions lost during zip extraction (Linux)
+        java_bin_dir = IMAGETRANS_DIR / 'jre' / 'bin'
+        if java_bin_dir.exists():
+            import stat
+            for f in java_bin_dir.iterdir():
+                if f.is_file():
+                    f.chmod(f.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         temp_zip.unlink()
 

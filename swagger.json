@@ -305,6 +305,52 @@
           }
         }
       }
+    },
+    "/api/upload-imagetrans": {
+      "post": {
+        "tags": [
+          "Administration"
+        ],
+        "summary": "Upload and install ImageTrans from zip",
+        "description": "Upload imagetrans.zip to install or update ImageTrans. Extracts directly to the ImageTrans directory.",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "formData",
+            "name": "file",
+            "type": "file",
+            "required": true,
+            "description": "The imagetrans.zip file containing the full ImageTrans installation"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Installation successful",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or missing file"
+          },
+          "500": {
+            "description": "Server error during extraction"
+          }
+        }
+      }
     }
   }
 }

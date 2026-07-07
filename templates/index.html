@@ -350,6 +350,7 @@
             <button class="tab active" onclick="switchTab('translate')">📝 创建翻译任务</button>
             <button class="tab" onclick="switchTab('tasks')">📋 任务列表</button>
             <button class="tab" onclick="switchTab('templates')">📁 模板管理</button>
+            <button class="tab" onclick="switchTab('admin')">🔧 管理</button>
             <button class="tab" onclick="switchTab('api-docs')">📚 API文档</button>
         </div>
 
@@ -465,6 +466,23 @@
             </div>
         </div>
 
+        <!-- 管理 -->
+        <div id="tab-admin" class="tab-content">
+            <div class="card full-width">
+                <h2>📦 上传 ImageTrans 安装包</h2>
+                <p style="color: #666; margin-bottom: 20px;">上传 imagetrans.zip，程序会自动解压覆盖到 ImageTrans 目录。上传期间服务仍可正常使用。</p>
+                <div class="form-group">
+                    <label>选择 ZIP 文件</label>
+                    <input type="file" id="imagetransZip" accept=".zip" onchange="document.getElementById('zipFileName').textContent = this.files[0]?.name || ''">
+                    <span id="zipFileName" style="color: #888; font-size: 13px; margin-left: 10px;"></span>
+                </div>
+                <button class="btn btn-primary" onclick="uploadImageTrans()">
+                    ⬆️ 上传并安装
+                </button>
+                <div id="uploadResult" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+
         <!-- API文档 -->
         <div id="tab-api-docs" class="tab-content">
             <div class="card full-width">
@@ -499,6 +517,10 @@
                         <li style="margin: 10px 0; padding: 15px; background: white; border-radius: 8px;">
                             <strong>GET /api/tasks</strong>
                             <p style="color: #666; margin-top: 5px;">获取所有任务列表</p>
+                        </li>
+                        <li style="margin: 10px 0; padding: 15px; background: white; border-radius: 8px;">
+                            <strong>POST /api/upload-imagetrans</strong>
+                            <p style="color: #666; margin-top: 5px;">上传 imagetrans.zip 安装包，解压到 ImageTrans 目录</p>
                         </li>
                     </ul>
                 </div>
@@ -701,6 +723,7 @@
                 'translate': '创建翻译任务',
                 'tasks': '任务列表',
                 'templates': '模板管理',
+                'admin': '管理',
                 'api-docs': 'API文档'
             };
             return map[tabName] || tabName;
@@ -942,6 +965,44 @@
                 .catch(error => {
                     resultDiv.innerHTML = `<div class="error-message">❌ 获取失败: ${error.message}</div>`;
                 });
+        }
+
+        // 上传 ImageTrans 安装包
+        function uploadImageTrans() {
+            const fileInput = document.getElementById('imagetransZip');
+            const file = fileInput.files[0];
+            const resultDiv = document.getElementById('uploadResult');
+
+            if (!file) {
+                resultDiv.innerHTML = '<div class="error-message">请先选择 ZIP 文件</div>';
+                return;
+            }
+
+            if (!file.name.toLowerCase().endsWith('.zip')) {
+                resultDiv.innerHTML = '<div class="error-message">只支持 .zip 文件</div>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            resultDiv.innerHTML = '<div class="success-message">⏳ 正在上传并解压，请稍候...</div>';
+
+            fetch('/api/upload-imagetrans', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class="success-message">✅ ${data.message}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<div class="error-message">❌ 上传失败: ${error.message}</div>`;
+            });
         }
 
         // 自动刷新任务列表（每30秒）

@@ -27,11 +27,8 @@ def add_cors_headers(response):
 BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / 'templates'
 TEMP_DIR = BASE_DIR / 'temp'  # 临时任务目录
-IMAGETRANS_DIRS = [
-    BASE_DIR / 'ImageTrans1',
-    BASE_DIR / 'ImageTrans2',
-    BASE_DIR / 'ImageTrans3'
-]
+IMAGETRANS_DIR = BASE_DIR / 'ImageTrans'
+
 TASKS_FILE = BASE_DIR / 'tasks.json'
 MAX_CONCURRENT_TASKS = 3
 TASK_CLEANUP_DELAY = 1800  # 30 minutes in seconds
@@ -39,13 +36,13 @@ TASK_CLEANUP_DELAY = 1800  # 30 minutes in seconds
 # Ensure directories exist
 TEMPLATES_DIR.mkdir(exist_ok=True)
 TEMP_DIR.mkdir(exist_ok=True)
-for d in IMAGETRANS_DIRS:
-    d.mkdir(exist_ok=True)
+IMAGETRANS_DIR.mkdir(exist_ok=True)
 
 # Task management
 tasks = {}
 task_lock = threading.Lock()
-available_workers = list(range(3))  # 0-2 for ImageTrans1-3
+available_workers = list(range(3))
+worker_lock = threading.Lock()
 worker_lock = threading.Lock()
 
 # Load existing tasks if any
@@ -120,7 +117,7 @@ def process_image_trans(task_id, template_name, settings_json, preferences_conf,
             save_tasks()
         
         # Execute ImageTrans command
-        imagetrans_dir = IMAGETRANS_DIRS[worker_id]
+        imagetrans_dir = IMAGETRANS_DIR
         
         # 检查 Java 可执行文件是否存在
         java_path = imagetrans_dir / 'jre' / 'bin' / 'java'
@@ -936,6 +933,77 @@ def list_instances():
         'displayName': 'default',
         'name': 'imagetrans_server'
     }])
+
+
+@app.route('/api/upload-imagetrans', methods=['POST'])
+def upload_imagetrans():
+    """
+    Upload and install ImageTrans from a zip file.
+    Extracts directly to the ImageTrans directory.
+    ---
+    tags:
+      - Administration
+    parameters:
+      - in: formData
+        name: file
+        type: file
+        required: true
+        description: imagetrans.zip containing the ImageTrans installation
+    responses:
+      200:
+        description: Installation successful
+      400:
+        description: Invalid request or missing file
+      500:
+        description: Server error during extraction
+    """
+    import zipfile
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if not file.filename.lower().endswith('.zip'):
+        return jsonify({'error': 'File must be a .zip file'}), 400
+
+    temp_zip = BASE_DIR / '_imagetrans_upload.zip'
+
+    try:
+        file.save(str(temp_zip))
+
+        if not zipfile.is_zipfile(temp_zip):
+            temp_zip.unlink()
+            return jsonify({'error': 'Uploaded file is not a valid zip archive'}), 400
+
+        # Remove old installation
+        if IMAGETRANS_DIR.exists():
+            shutil.rmtree(IMAGETRANS_DIR, ignore_errors=True)
+
+        # Extract directly to ImageTrans directory
+        IMAGETRANS_DIR.mkdir(parents=True)
+        with zipfile.ZipFile(temp_zip, 'r') as zf:
+            zf.extractall(str(IMAGETRANS_DIR))
+
+        temp_zip.unlink()
+
+        return jsonify({
+            'success': True,
+            'message': 'ImageTrans installed successfully'
+        })
+
+    except zipfile.BadZipFile:
+        if temp_zip.exists():
+            temp_zip.unlink()
+        return jsonify({'error': 'Invalid or corrupted zip file'}), 400
+    except Exception as e:
+        if temp_zip.exists():
+            temp_zip.unlink()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

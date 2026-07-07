@@ -1,7 +1,4 @@
 *.pyc
-ImageTrans1
-ImageTrans2
-ImageTrans3
-ImageTrans4
+ImageTrans
 temp
 tasks.json

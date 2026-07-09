@@ -23,6 +23,8 @@ The zip should contain the root level of ImageTrans, with files like the followi
 ```
 jre
 ImageTrans.jar
+account # your account info
+preferences.conf # with your API keys
 ```
 
 ## Supported Platforms

@@ -10,11 +10,31 @@ Its API is compatible with the [ImageTrans_wsServer](https://github.com/xulihang
 
 Docker image is also available: <https://hub.docker.com/r/xulihang/imagetrans>
 
+### Using Pre-built Image
+
 Run the following to start it:
 
 1. docker pull xulihang/imagetrans
 2. docker run -d -p 5000:5000 --name imagetrans xulihang/imagetrans
 3. Go to http://localhost:5000 and upload ImageTrans.zip via the web interface.
+
+### Building from Dockerfile
+
+Clone the repository and build the image locally:
+
+```bash
+git clone https://github.com/xulihang/image-translation-server.git
+cd image-translation-server
+docker build -t imagetrans .
+```
+
+Then run the container:
+
+```bash
+docker run -d -p 5000:5000 --name imagetrans imagetrans
+```
+
+Go to http://localhost:5000 and upload ImageTrans.zip via the web interface.
 
 ## ZIP
 

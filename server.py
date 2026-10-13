@@ -14,6 +14,12 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
+# Flask 3.1 defaults MAX_FORM_MEMORY_SIZE to 500KB, which rejects large base64
+# image fields in /translate and /translateRegion with 413. Raise both limits.
+MAX_REQUEST_SIZE = 50 * 1024 * 1024  # 50 MB
+app.config['MAX_CONTENT_LENGTH'] = MAX_REQUEST_SIZE
+app.config['MAX_FORM_MEMORY_SIZE'] = MAX_REQUEST_SIZE
+
 
 @app.after_request
 def add_cors_headers(response):

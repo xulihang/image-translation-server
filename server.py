@@ -30,7 +30,7 @@ def add_cors_headers(response):
     return response
 
 # Configuration
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / 'templates'
 TEMP_DIR = BASE_DIR / 'temp'  # 临时任务目录
 IMAGETRANS_DIR = BASE_DIR / 'ImageTrans'
